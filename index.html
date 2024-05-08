@@ -94,7 +94,7 @@
         let cachedPath = "";
         let conn = null;
 
-        // Create a new feature extraction pipeline
+        // Instantiate the embeddings (feature extraction) pipeline
         status.textContent = 'Loading embedding model...';
         const extractor = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
         status.textContent = 'Ready for user!';
@@ -106,6 +106,7 @@
         // Select a bundle based on browser checks
         const bundle = await duckdb.selectBundle(JSDELIVR_BUNDLES);
 
+        // Create a new web worker for database operations
         const worker_url = URL.createObjectURL(
             new Blob([`importScripts("${bundle.mainWorker}");`], {type: 'text/javascript'})
         );
@@ -118,6 +119,7 @@
         await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
         URL.revokeObjectURL(worker_url);
 
+        // Function to calculate Euclidean distance squared between two vectors
         function euclideanDistanceSquared(arr1, arr2) {
             if (arr1.length !== arr2.length) {
                 throw new Error("Arrays must be of the same length");
@@ -129,6 +131,7 @@
             return sum;
         }
 
+        // Function to search with SQL queries using the DuckDB connection
         async function searchWithSql(
             conn,
             queryData,
@@ -151,12 +154,14 @@
 
             const maxLayer = count > 0 ? Math.floor(Math.log2(count)) : 0;
 
+            // query the database to randomly select one row from the nodes.parquet table
             const initNodeQuery = `
                 SELECT n.node_id, n.data as node_data
                 FROM nodes.parquet n
                 ORDER BY RANDOM() LIMIT 1
             `;
             let currentBest = await conn.query(initNodeQuery);
+            // compare the current embedding vector to the randomly selected row embedding
             currentBest = currentBest.toArray().map(([nId, data]) => ([nId[1], euclideanDistanceSquared(data[1].data[0].values, queryData)]))
 
             for (let layer = maxLayer; layer >= 0; layer--) {
@@ -169,6 +174,7 @@
                     const candidates = new Set(currentNodeIds);
                     const newCandidates = new Set();
 
+                    // maintain a visited Array
                     const filteredCandidates = Array.from(candidates).filter(nodeId => !cache[nodeId] || !cache[nodeId][layer]);
 
                     if (filteredCandidates.length === 0) {
@@ -204,6 +210,7 @@
                         continue;
                     }
 
+                    // Loop through neighbors
                     for (const [neighborId_, node_data_] of neighbors) {
                         const neighborId = neighborId_[1];
                         if (newCandidates.has(neighborId)) {
@@ -212,12 +219,15 @@
                         const data = node_data_[1].data[0].values;
                         let dist;
                 
+                        // get dist if neighbors exists in cache otherwise calculate fresh euclideanDistanceSquared
                         if (cache[neighborId] && cache[neighborId].data) {
                             dist = cache[neighborId].distance;
                         } else {
                             dist = euclideanDistanceSquared(data, queryData);
                             cache[neighborId] = { data, distance: dist };
                         }
+                        
+                       // Include the neighbor in newCandidates if the difference in embeddingVectors is smaller
                         if (currentBest.length < ef || dist < currentBest[currentBest.length - 1][1]) {
                             currentBest.push([neighborId, dist]);
                             newCandidates.add(neighborId);
