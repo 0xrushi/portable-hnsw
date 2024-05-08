@@ -131,6 +131,30 @@
             return sum;
         }
 
+        function quantizeVector(vector, bitsPerDimension = 8) {
+            const maxVal = Math.max(...vector);
+            const minVal = Math.min(...vector);
+            const range = maxVal - minVal;
+            const scale = (2 ** bitsPerDimension) - 1;
+
+            // appropriate typed array based on bitsPerDimension
+            let TypedArrayConstructor;
+            if (bitsPerDimension <= 8) {
+                TypedArrayConstructor = Uint8Array;
+            } else if (bitsPerDimension <= 16) {
+                TypedArrayConstructor = Uint16Array;
+            } else {
+                TypedArrayConstructor = Uint32Array;
+            }
+            
+            const quantizedVector = new TypedArrayConstructor(vector.length);
+            for (let i = 0; i < vector.length; i++) {
+                let normalizedVector = vector[i] - minVal / range;
+                quantizedVector[i] = Math.floor((normalizedVector * scale) / scale);
+            }
+            return quantizedVector;
+        }
+
         // Function to search with SQL queries using the DuckDB connection
         async function searchWithSql(
             conn,
@@ -151,6 +175,7 @@
             const countResult = await conn.query(countQuery);
             const countArrayed = countResult.toArray().map(([count, _]) => count[1]);
             const count = JSON.parse(countArrayed[0].toString());
+            const quantizedQueryData = quantizeVector(queryData);
 
             const maxLayer = count > 0 ? Math.floor(Math.log2(count)) : 0;
 
@@ -162,7 +187,7 @@
             `;
             let currentBest = await conn.query(initNodeQuery);
             // compare the current embedding vector to the randomly selected row embedding
-            currentBest = currentBest.toArray().map(([nId, data]) => ([nId[1], euclideanDistanceSquared(data[1].data[0].values, queryData)]))
+            currentBest = currentBest.toArray().map(([nId, data]) => ([nId[1], euclideanDistanceSquared(data[1].data[0].values, quantizedQueryData)]))
 
             for (let layer = maxLayer; layer >= 0; layer--) {
                 status.textContent = `Searching HNSW Index: ${layer + 1} layers remaining...`;
@@ -223,7 +248,7 @@
                         if (cache[neighborId] && cache[neighborId].data) {
                             dist = cache[neighborId].distance;
                         } else {
-                            dist = euclideanDistanceSquared(data, queryData);
+                            dist = euclideanDistanceSquared(data, quantizedQueryData);
                             cache[neighborId] = { data, distance: dist };
                         }
                         
@@ -241,7 +266,6 @@
             }
 
             const ids = currentBest.slice(0, k).map(([nodeId, _]) => nodeId);
-            console.log(ids);
 
             status.textContent = `Found best candidates. Retrieving documents...`;
 

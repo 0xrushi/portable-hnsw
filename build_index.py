@@ -31,6 +31,19 @@ def _square_distances(data_matrix, node_data):
 def save_to_parquet(df, file_name):
     table = pa.Table.from_pandas(df)
     pq.write_table(table, file_name)
+    
+def quantize_vector(vector, bits_per_dimension=8):
+    min_val = np.min(vector)
+    max_val = np.max(vector)
+    range_val = max_val - min_val
+    scale = (2 ** bits_per_dimension) - 1
+    
+    # Normalize the vector
+    normalized_vector = (vector - min_val) / range_val
+    
+    quantized_vector = np.floor(normalized_vector * scale) / scale
+    
+    return quantized_vector
 
 class HNSWNode:
     def __init__(self, data, id):
@@ -44,7 +57,7 @@ class HNSWIndex:
 
     Kind of.
     """
-    def __init__(self, dim, M=16, ef_construction=200, max_elements=10000):
+    def __init__(self, dim, M=16, ef_construction=200, max_elements=10000, bits_per_dimension=8):
         self.dim = dim  # Dimensionality of the data points.
         self.M = M  # Maximum number of connections per node in the graph.
         self.ef_construction = ef_construction  # Size of the dynamic candidate list during the construction phase.
@@ -53,6 +66,7 @@ class HNSWIndex:
         self.data_matrix = np.zeros((max_elements, dim))  # Pre-allocated if max_elements is a good estimate
         self.data_list = []  # Temporary storage for new data points
         self.current_size = 0  # Tracks the number of data points added
+        self.bits_per_dimension = bits_per_dimension
 
         # Set the maximum layer of the graph based on the maximum elements, using a logarithmic scale.
         self.max_layer = int(np.log2(max_elements)) if max_elements > 0 else 0
@@ -80,7 +94,8 @@ class HNSWIndex:
         update the data matrix and assign neighbors to the new node.
         """
         node_id = len(self.nodes)
-        node = HNSWNode(data, node_id)
+        quantized_data = quantize_vector(data, self.bits_per_dimension)
+        node = HNSWNode(quantized_data, node_id)
         self.nodes.append(node)
         self.data_list.append(data)
 
