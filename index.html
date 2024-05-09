@@ -143,16 +143,20 @@
             // appropriate typed array based on bitsPerDimension
             let TypedArrayConstructor;
             if (bitsPerDimension <= 8) {
-                TypedArrayConstructor = Uint8Array;
+                TypedArrayConstructor = Int8Array;
             } else if (bitsPerDimension <= 16) {
-                TypedArrayConstructor = Uint16Array;
+                TypedArrayConstructor = Int16Array;
             } else {
-                TypedArrayConstructor = Uint32Array;
+                TypedArrayConstructor = Int32Array;
             }
             
             const quantizedVector = new TypedArrayConstructor(vector.length);
             for (let i = 0; i < vector.length; i++) {
-                let normalizedVector = vector[i] - minVal / range;
+                // 0-1 normalization unsigned
+                // let normalizedVector = vector[i] - minVal / range;
+
+                // -1 -> 1 normalization signed
+                let normalizedVector = 2 * ((vector[i] - minVal) / range) - 1
                 quantizedVector[i] = Math.floor((normalizedVector * scale));
             }
             return quantizedVector;
@@ -294,10 +298,10 @@
             status.textContent = 'Loading HNSW Index...';
             conn = await db.connect();
             const nodesRes = await fetch(`${cachedPath}/nodes.parquet`);
-            // edit this Uint8Array as per quantization
-            await db.registerFileBuffer('nodes.parquet', new Uint8Array(await nodesRes.arrayBuffer()));
+            // edit this Int8Array as per quantization
+            await db.registerFileBuffer('nodes.parquet', new Int8Array(await nodesRes.arrayBuffer()));
             const edgesRes = await fetch(`${cachedPath}/edges.parquet`);
-            await db.registerFileBuffer('edges.parquet', new Uint8Array(await edgesRes.arrayBuffer()));
+            await db.registerFileBuffer('edges.parquet', new Int8Array(await edgesRes.arrayBuffer()));
             status.textContent = 'HNSW Index Loaded.';
             status.textContent = 'Ready for user!';
         }

@@ -39,7 +39,11 @@ def quantize_vector(vector, bits_per_dimension=8):
     scale = (2 ** bits_per_dimension) - 1
     
     # Normalize the vector
-    normalized_vector = (vector - min_val) / range_val
+    # 0-1 normalization unsigned
+    # normalized_vector = (vector - min_val) / range_val
+    
+    # -1->1 normalization signed
+    normalized_vector = 2 * ((vector - min_val) / range_val) - 1
     
     quantized_vector = np.floor(normalized_vector * scale)
     
