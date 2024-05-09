@@ -41,7 +41,7 @@ def quantize_vector(vector, bits_per_dimension=8):
     # Normalize the vector
     normalized_vector = (vector - min_val) / range_val
     
-    quantized_vector = np.floor(normalized_vector * scale) / scale
+    quantized_vector = np.floor(normalized_vector * scale)
     
     return quantized_vector
 
@@ -249,12 +249,14 @@ def serialize_hnsw_to_tables_v2(hnsw_index):
     nodes_df = pd.DataFrame(nodes_data, columns=['node_id', 'data'])
     edges_df = pd.DataFrame(edges_data, columns=['source_node_id', 'target_node_id', 'layer'])
     
-     # Ensure correct data types
-    nodes_df['node_id'] = nodes_df['node_id'].astype('int32')
-
-    edges_df['source_node_id'] = edges_df['source_node_id'].astype('int32')
-    edges_df['target_node_id'] = edges_df['target_node_id'].astype('int32')
-    edges_df['layer'] = edges_df['layer'].astype('int32')
+    # Ensure correct data types
+    # nodes_df['node_id'] = nodes_df['node_id'].astype('int32')
+    
+    # 8 bit quantized
+    nodes_df['node_id'] = nodes_df['node_id'].astype('int8')
+    edges_df['source_node_id'] = edges_df['source_node_id'].astype('int8')
+    edges_df['target_node_id'] = edges_df['target_node_id'].astype('int8')
+    edges_df['layer'] = edges_df['layer'].astype('int8')
     
     edges_df.sort_values(by=['source_node_id', 'layer'], inplace=True)
     edges_df.set_index(['source_node_id', 'target_node_id', 'layer'])
