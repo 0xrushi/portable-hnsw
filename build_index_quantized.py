@@ -291,11 +291,11 @@ def from_list(list, folder, max_chunk_chars=4000, precomputed_embeddings=None):
     index = create_hnsw_index(embeddings)
     # Serialize the HNSW index to a table
     (nodes, edges) = serialize_hnsw_to_tables_v2(index)
-    save_to_parquet(nodes, f"{folder}/nodes.parquet")
-    save_to_parquet(edges, f"{folder}/edges.parquet")
+    save_to_parquet(nodes, f"{folder}/nodes_quantized.parquet")
+    save_to_parquet(edges, f"{folder}/edges_quantized.parquet")
 
     all_docs = pd.DataFrame([{ "id": i, "text": doc } for i, doc in enumerate(list) ])
-    save_to_parquet(all_docs, f"{folder}/docs.parquet")
+    save_to_parquet(all_docs, f"{folder}/docs_quantized.parquet")
     return nodes, edges
 
 def from_document(path, folder, max_chunk_chars=4000, precomputed_embeddings=None):

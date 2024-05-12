@@ -102,15 +102,15 @@ async function searchWithSql(conn, queryData, k, path, ef = 10) {
   status.textContent = "Searching HNSW Index...";
 
   await db.registerFileURL(
-    "docs.parquet",
-    `${path}/docs.parquet`,
+    "docs_quantized.parquet",
+    `${path}/docs_quantized.parquet`,
     duckdb.DuckDBDataProtocol.HTTP,
     false
   );
 
   const cache = {};
 
-  const countQuery = `SELECT COUNT(node_id) FROM nodes.parquet`;
+  const countQuery = `SELECT COUNT(node_id) FROM nodes_quantized.parquet`;
   const countResult = await conn.query(countQuery);
   const countArrayed = countResult.toArray().map(([count, _]) => count[1]);
   const count = JSON.parse(countArrayed[0].toString());
@@ -121,7 +121,7 @@ async function searchWithSql(conn, queryData, k, path, ef = 10) {
   // query the database to randomly select one row from the nodes.parquet table
   const initNodeQuery = `
                 SELECT n.node_id, n.data as node_data
-                FROM nodes.parquet n
+                FROM nodes_quantized.parquet n
                 ORDER BY RANDOM() LIMIT 1
             `;
   let currentBest = await conn.query(initNodeQuery);
@@ -163,7 +163,7 @@ async function searchWithSql(conn, queryData, k, path, ef = 10) {
       const createFilteredEdgesQuery = `
                         DROP TABLE IF EXISTS filtered_edges;
                         CREATE TEMP TABLE filtered_edges AS
-                        SELECT * FROM edges.parquet
+                        SELECT * FROM edges_quantized.parquet
                         WHERE source_node_id IN (${sqlSafeFilteredCandidates})
                         AND layer = ${layer}
                         AND target_node_id NOT IN (${sqlSafeCandidates});
@@ -175,7 +175,7 @@ async function searchWithSql(conn, queryData, k, path, ef = 10) {
                         SELECT 
                             e.target_node_id as node_id, 
                             n.data as node_data
-                        FROM nodes.parquet n
+                        FROM nodes_quantized.parquet n
                         INNER JOIN filtered_edges e ON n.node_id = e.target_node_id
                     `;
       const neighbors = (await conn.query(fetchNeighborsQuery)).toArray();
@@ -224,7 +224,7 @@ async function searchWithSql(conn, queryData, k, path, ef = 10) {
   const out = await Promise.all(
     ids.map(async (id) => {
       const result = await conn.query(
-        `SELECT text FROM read_parquet('${path}/docs.parquet') OFFSET ${id} LIMIT 1`
+        `SELECT text FROM read_parquet('${path}/docs_quantized.parquet') OFFSET ${id} LIMIT 1`
       );
       return result.toArray().map(([item]) => item[1])[0];
     })
@@ -246,15 +246,15 @@ async function loadIndex() {
   }
   status.textContent = "Loading HNSW Index...";
   conn = await db.connect();
-  const nodesRes = await fetch(`${cachedPath}/nodes.parquet`);
+  const nodesRes = await fetch(`${cachedPath}/nodes_quantized.parquet`);
   // edit this Int8Array as per quantization
   await db.registerFileBuffer(
-    "nodes.parquet",
+    "nodes_quantized.parquet",
     new Int8Array(await nodesRes.arrayBuffer())
   );
-  const edgesRes = await fetch(`${cachedPath}/edges.parquet`);
+  const edgesRes = await fetch(`${cachedPath}/edges_quantized.parquet`);
   await db.registerFileBuffer(
-    "edges.parquet",
+    "edges_quantized.parquet",
     new Int8Array(await edgesRes.arrayBuffer())
   );
   status.textContent = "HNSW Index Loaded.";
