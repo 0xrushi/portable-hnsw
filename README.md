@@ -12,7 +12,7 @@ poetry run python build_index.py <path to text file> [output folder]
 
 # To run quantized version
 poetry run python build_index_quantized.py <path to text file> [output folder]
-# You also need to change the script path to quantized (import './scripts/vectordb_utils_quantized.js';  in index.html)
+# To use the quantized version, configure the web server to serve `index_quantized.html` instead of `index.html`.
 
 ```
 
